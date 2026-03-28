@@ -7,11 +7,15 @@ import React, { useState, useEffect } from 'react';
 import { generateChallenge, WordData, PolysemyChallenge } from './services/ai';
 import SemanticGraph from './components/SemanticGraph';
 import VoiceButton from './components/VoiceButton';
+import SpeechInput from './components/SpeechInput';
 import { sounds } from './services/sounds';
-import { Brain, Sparkles, Network, PlayCircle, CheckCircle2, XCircle, Loader2, Flame, Star, Trophy, ArrowRight, ListOrdered, RotateCcw, X, Volume2, Heart, PartyPopper, Clock } from 'lucide-react';
+import { Brain, Sparkles, Network, PlayCircle, CheckCircle2, XCircle, Loader2, Flame, Star, Trophy, ArrowRight, ListOrdered, RotateCcw, X, Volume2, Heart, PartyPopper, Clock, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
+import AdminLogin from './components/AdminLogin';
+import AdminDashboard from './components/AdminDashboard';
+import { initDB } from './services/db';
 
 export default function App() {
   const [word, setWord] = useState('படி');
@@ -20,7 +24,13 @@ export default function App() {
   const [wordData, setWordData] = useState<WordData | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'graph'>('game');
   
-  // Game State
+  // App Navigation & Auth
+  const [view, setView] = useState<'game' | 'login' | 'admin'>('game');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    initDB();
+  }, []);
   const [currentSenseIndex, setCurrentSenseIndex] = useState(0);
   const [options, setOptions] = useState<string[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -190,8 +200,26 @@ export default function App() {
     setShowResetConfirm(false);
   };
 
+  const handleAdminLogin = async (email: string, pass: string) => {
+    if (email === 'karthikeyanspro@gmail.com' && pass === 'tesla123') {
+      setIsAdmin(true);
+      setView('admin');
+      return true;
+    }
+    return false;
+  };
+
   const currentSense = wordData?.senses[currentSenseIndex];
   const progress = wordData ? (isCompleted ? 100 : (currentSenseIndex / wordData.senses.length) * 100) : 0;
+
+  // View Routing
+  if (view === 'login') {
+    return <AdminLogin onLogin={handleAdminLogin} onBack={() => setView('game')} />;
+  }
+
+  if (view === 'admin' && isAdmin) {
+    return <AdminDashboard onBack={() => setView('game')} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-pink-50 to-violet-100 text-slate-900 font-sans pb-12 selection:bg-violet-200 overflow-x-hidden">
@@ -279,14 +307,20 @@ export default function App() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto relative z-10">
-              <div className="flex-1 text-left">
+              <div className="flex-1 text-left relative">
                 <input 
                   type="text" 
                   value={word}
                   onChange={(e) => setWord(e.target.value)}
-                  className="w-full px-6 py-4 text-xl font-bold rounded-2xl border-4 border-slate-200 focus:border-violet-500 focus:ring-0 outline-none transition-all shadow-sm bg-white/80"
+                  className="w-full px-6 py-4 pr-20 text-xl font-bold rounded-2xl border-4 border-slate-200 focus:border-violet-500 focus:ring-0 outline-none transition-all shadow-sm bg-white/80"
                   placeholder="e.g., படி or 'அவன் பாடம் படித்தான்'"
                 />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <SpeechInput 
+                    onTranscript={(text) => setWord(text)} 
+                    className="scale-90"
+                  />
+                </div>
               </div>
             </div>
             
@@ -659,6 +693,32 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Footer / Admin Access */}
+      {wordData && !isCompleted && (
+        <footer className="max-w-3xl mx-auto px-4 mt-12 pb-12 flex justify-end">
+          <button 
+            onClick={() => setView('login')}
+            className="text-slate-400 hover:text-violet-500 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-colors border-2 border-transparent hover:border-violet-100 px-4 py-2 rounded-xl"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            Admin Access
+          </button>
+        </footer>
+      )}
+
+      {!wordData && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <button 
+            onClick={() => setView('login')}
+            className="flex items-center gap-3 px-6 py-4 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl shadow-[0_8px_30px_rgba(124,58,237,0.4)] border-b-4 border-violet-800 active:border-b-0 active:translate-y-1 transition-all"
+            title="Admin Moderation"
+          >
+            <Lock className="w-5 h-5" />
+            <span className="text-sm tracking-tight">ADMIN PANEL</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

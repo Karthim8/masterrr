@@ -15,13 +15,34 @@ export interface WordData {
   senses: PolysemyChallenge[];
 }
 
+import { getCachedChallenge, savePendingChallenge } from './db';
+
 export async function generateChallenge(word: string, model: string): Promise<WordData> {
-  if (model === 'gemini') {
-    return generateWithGemini(word);
-  } else {
-    // Simulate other models (Mistral, Sonar)
-    return simulateOtherModels(word, model);
+  // 1. Check database cache for approved versions first
+  try {
+    const cachedData = await getCachedChallenge(word);
+    if (cachedData) {
+      console.log(`Loading ${word} from cache (verified)`);
+      return cachedData;
+    }
+  } catch (err) {
+    console.error("Cache lookup failed, proceeding to AI:", err);
   }
+
+  // 2. Generate with AI if not in cache or not approved
+  let data: WordData;
+  if (model === 'gemini') {
+    data = await generateWithGemini(word);
+  } else {
+    data = await simulateOtherModels(word, model);
+  }
+
+  // 3. Save to pending moderation queue (background)
+  // We show it to the user immediately to keep the app responsive, 
+  // but it won't be in the cache until an admin approves it.
+  savePendingChallenge(data).catch(err => console.error("Failed to save pending:", err));
+
+  return data;
 }
 
 async function generateWithGemini(word: string): Promise<WordData> {
@@ -68,7 +89,7 @@ Ensure high quality and no hallucinations.`;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash-lite",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
